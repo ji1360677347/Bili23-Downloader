@@ -65,45 +65,87 @@ class ListParser(ParserBase):
     def get_seasons_archives_list(self):
         # 合集，以 season_id 区分
         # 形如 https://space.bilibili.com/{mid}/lists/{season_id}?type=season
-        params = {
-            "mid": self.mid,
-            "season_id": self.season_id,
-            "sort_reverse": "false",
-            "page_size": 30,
-            "page_num": self.pn,
-            "web_location": "333.1387",
-        }
+        all_archives = []
+        page_num = 1
+        total_count = 0
+        response = None
 
-        url = f"https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?{urlencode(params)}"
+        while True:
+            params = {
+                "mid": self.mid,
+                "season_id": self.season_id,
+                "sort_reverse": "false",
+                "page_size": 30,
+                "page_num": page_num,
+                "web_location": "333.1387",
+            }
 
-        request = SyncNetWorkRequest(url)
-        response = request.run()
+            url = f"https://api.bilibili.com/x/polymer/web-space/seasons_archives_list?{urlencode(params)}"
 
-        self.check_response(response)
+            request = SyncNetWorkRequest(url)
+            res = request.run()
 
-        self.info_data = response
+            self.check_response(res)
+            
+            data = res.get("data") or {}
+            archives = data.get("archives") or []
+            all_archives.extend(archives)
+            
+            total_count = data.get("page", {}).get("total", 0)
+            if not archives or len(all_archives) >= total_count:
+                response = res
+                break
+                
+            page_num += 1
+
+        if response:
+            response["data"]["archives"] = all_archives
+            response["data"]["page"]["num"] = 1
+            response["data"]["page"]["size"] = len(all_archives)
+            self.info_data = response
 
     def get_series_archives_list(self):
         # 系列，以 series_id 区分
         # 形如 https://space.bilibili.com/{mid}/lists/{series_id}?type=series
-        params = {
-            "mid": self.mid,
-            "series_id": self.series_id,
-            "only_normal": "true",
-            "sort": "desc",
-            "ps": 30,
-            "pn": self.pn,
-            "web_location": "333.1387",
-        }
+        all_archives = []
+        page_num = 1
+        total_count = 0
+        response = None
 
-        url = f"https://api.bilibili.com/x/series/archives?{urlencode(params)}"
+        while True:
+            params = {
+                "mid": self.mid,
+                "series_id": self.series_id,
+                "only_normal": "true",
+                "sort": "desc",
+                "ps": 30,
+                "pn": page_num,
+                "web_location": "333.1387",
+            }
 
-        request = SyncNetWorkRequest(url)
-        response = request.run()
+            url = f"https://api.bilibili.com/x/series/archives?{urlencode(params)}"
 
-        self.check_response(response)
+            request = SyncNetWorkRequest(url)
+            res = request.run()
 
-        self.info_data = response
+            self.check_response(res)
+            
+            data = res.get("data") or {}
+            archives = data.get("archives") or []
+            all_archives.extend(archives)
+            
+            total_count = data.get("page", {}).get("total", 0)
+            if not archives or len(all_archives) >= total_count:
+                response = res
+                break
+                
+            page_num += 1
+
+        if response:
+            response["data"]["archives"] = all_archives
+            response["data"]["page"]["num"] = 1
+            response["data"]["page"]["size"] = len(all_archives)
+            self.info_data = response
 
     def get_series_meta_info(self):
         # 由于系列的接口不含 meta 信息，还需要额外获取
@@ -126,14 +168,7 @@ class ListParser(ParserBase):
         return "COLLECTION_LIST"
     
     def get_extra_data(self):
-        count = self.info_data["data"]["page"]["total"]
-
         return {
-            "pagination": True,
-            "pagination_data": {
-                "total_pages": math.ceil(count / 30),
-                "total_items": count,
-                "current_page": self.pn
-            }
+            "pagination": False
         }
     
